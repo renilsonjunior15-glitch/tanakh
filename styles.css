@@ -44,6 +44,14 @@ button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .he { font-family: var(--font-he); direction: rtl; unicode-bidi: isolate; }
+.gr { font-family: 'Gentium Plus', 'Noto Serif', 'Times New Roman', serif; direction: ltr; }
+.heb.gr { direction: ltr; font-size: calc(var(--he-size) * .92); line-height: 1.7; }
+.chapter-head .gr { display: block; font-size: 26px; color: var(--gold); line-height: 1.4; }
+.sec-title .gr { color: var(--gold); font-size: 18px; }
+.book .gr { font-size: 15px; color: var(--gold); text-align: left; }
+.drawer-sec .gr { color: var(--gold); margin-left: 6px; }
+.lex-word.gr { font-size: 36px; direction: ltr; }
+.lex-def .gr { font-size: 1.15em; }
 .muted { color: var(--muted); }
 [hidden] { display: none !important; }
 

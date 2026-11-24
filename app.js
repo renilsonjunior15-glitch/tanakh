@@ -48,7 +48,8 @@ async function fetchJSON(url) {
   } finally { clearTimeout(timer); }
 }
 const getPt = (b, c, t = S.settings.trans) => fetchJSON(`${API}/get-text/${t}/${b}/${c}/`);
-const getHeb = (b, c) => fetchJSON(`${API}/get-text/${HEB}/${b}/${c}/`);
+const GRK = 'TISCH'; // Novo Testamento grego (Tischendorf) com números de Strong
+const getHeb = (b, c) => fetchJSON(`${API}/get-text/${b > 39 ? GRK : HEB}/${b}/${c}/`);
 
 /* ---------- versificação (português ↔ hebraico) ---------- */
 function ptToHeb(b, c, v) {
@@ -80,7 +81,28 @@ const CONS = { 'א': '', 'ב': 'v', 'ג': 'g', 'ד': 'd', 'ה': 'h', 'ו': 'v', 
 const HARD = { 'ב': 'b', 'כ': 'k', 'ך': 'k', 'פ': 'p', 'ף': 'p' };
 const VOW = { 'ַ': 'a', 'ָ': 'a', 'ֶ': 'e', 'ֵ': 'e', 'ִ': 'i', 'ֹ': 'o', 'ֺ': 'o', 'ֻ': 'u', 'ֲ': 'a', 'ֱ': 'e', 'ֳ': 'o', 'ׇ': 'o' };
 const vowelOf = m => { for (const ch of m) if (VOW[ch]) return VOW[ch]; return ''; };
+// Transliteração do grego (simplificada)
+const GRK_MAP = { α: 'a', β: 'b', γ: 'g', δ: 'd', ε: 'e', ζ: 'z', η: 'ē', θ: 'th', ι: 'i', κ: 'k', λ: 'l', μ: 'm', ν: 'n', ξ: 'x', ο: 'o', π: 'p', ρ: 'r', σ: 's', ς: 's', τ: 't', υ: 'y', φ: 'ph', χ: 'ch', ψ: 'ps', ω: 'ō' };
+function translitGreek(word) {
+  const d = word.normalize('NFD');
+  let out = '';
+  for (let i = 0; i < d.length; i++) {
+    const ch = d[i];
+    if (/[̀-ͯ]/.test(ch)) continue;
+    const low = ch.toLowerCase();
+    let t = GRK_MAP[low];
+    if (t === undefined) { out += ch; continue; }
+    if (low === 'γ' && /[γκξχ]/i.test(d.slice(i + 1).replace(/[̀-ͯ]/g, '')[0] || '')) t = 'n';
+    if (low === 'υ' && /[aeēo]$/.test(out) && /[aeēo]$/.test(out.replace(/[^a-zēō]/gi, '').slice(-1))) t = 'u';
+    if (ch !== low) t = t[0].toUpperCase() + t.slice(1);
+    out += t;
+  }
+  const rough = /̔/.test(d.slice(0, 4));
+  if (rough && /^[aeēioyō]/i.test(out.replace(/^[^a-zA-Zēō]+/, ''))) out = out.replace(/^([^a-zA-Zēō]*)(.)/, (m, p, f) => p + (f === f.toUpperCase() ? 'H' : 'h') + f.toLowerCase());
+  return out.replace(/[,.;·:()\[\]]+/g, '');
+}
 function translit(word, strongs = []) {
+  if (/[Ͱ-Ͽἀ-῿]/.test(word)) return translitGreek(word);
   if (strongs.includes(3068) || strongs.includes(3069)) {
     const pre = translit(word.replace(/[י][֑-ׇ]*[ה][֑-ׇ]*[ו][֑-ׇ]*[ה][֑-ׇ]*$/, ''));
     return (pre ? pre + '-' : '') + 'YHWH';
@@ -201,7 +223,8 @@ function renderReader() {
   const seen = new Set(); const foots = [];
   const marks = new Set(S.bookmarks.filter(x => x.b === b && x.c === c).map(x => x.v));
   const transName = (TRANSLATIONS.find(t => t[0] === st.trans) || [, st.trans])[1];
-  let html = `<div class="chapter-head"><span class="he">${book.he}</span><h2>${esc(book.name)} ${c}</h2><small>${esc(book.tr)} · ${esc(transName)}</small></div>`;
+  const gk = b > 39, pre = gk ? 'G' : 'H';
+  let html = `<div class="chapter-head"><span class="${gk ? 'gr' : 'he'}">${book.he}</span><h2>${esc(book.name)} ${c}</h2><small>${esc(book.tr)} · ${esc(transName)}</small></div>`;
   for (const p of pairs) {
     let heb = '', tl = [];
     for (const h of p.h) {
@@ -212,32 +235,33 @@ function renderReader() {
         const shown = st.teamim ? t.w : stripTeamim(t.w);
         if (!t.s.length) { words += `<span class="w plain">${shown}</span> `; continue; }
         let sup = '';
+        const keys = t.s.map(n => pre + n);
         if (st.foot) {
-          const key = t.s.find(n => NOTES[n] && !seen.has(n));
+          const key = keys.find(k => notesFor(k) && !seen.has(k));
           if (key) { seen.add(key); foots.push({ n: key, v: p.v, w: stripTeamim(t.w) }); sup = `<sup>${footLetter(foots.length - 1)}</sup>`; }
         }
-        const tr = translit(t.w, t.s);
+        const tr = translit(t.w, gk ? [] : t.s);
         if (st.translit) tl.push(tr);
         if (st.mode === 'inter') {
-          words += `<button class="w" data-s="${t.s.join(',')}" data-w="${esc(t.w)}"><span>${shown}${sup}</span>${st.translit ? `<span class="t">${esc(tr)}</span>` : ''}${st.strong ? `<span class="s">H${t.s.join(' H')}</span>` : ''}</button>`;
+          words += `<button class="w" data-s="${keys.join(',')}" data-w="${esc(t.w)}"><span>${shown}${sup}</span>${st.translit ? `<span class="t">${esc(tr)}</span>` : ''}${st.strong ? `<span class="s">${keys.join(' ')}</span>` : ''}</button>`;
         } else {
-          words += `<button class="w" data-s="${t.s.join(',')}" data-w="${esc(t.w)}">${shown}${sup}</button> `;
+          words += `<button class="w" data-s="${keys.join(',')}" data-w="${esc(t.w)}">${shown}${sup}</button> `;
         }
       }
-      heb += label + `<div class="heb ${st.mode === 'inter' ? 'inter' : ''}">${words}</div>`;
+      heb += label + `<div class="heb ${gk ? 'gr' : ''} ${st.mode === 'inter' ? 'inter' : ''}">${words}</div>`;
     }
     if (st.mode !== 'inter' && st.translit && tl.length) heb += `<div class="translit-line">${esc(tl.join(' '))}</div>`;
     const note = S.notes[`${b}:${c}:${p.v}`];
     html += `<article class="verse" id="v-${p.v}">
       <div class="vhead"><button class="vnum" data-v="${p.v}">${p.v}</button><span class="vref">${esc(refShort(b, c, p.v))}</span>${marks.has(p.v) ? '<span class="vmark">🔖</span>' : ''}</div>
-      ${heb || '<div class="muted">(sem texto hebraico correspondente)</div>'}
+      ${heb || `<div class="muted">(sem texto ${gk ? 'grego' : 'hebraico'} correspondente)</div>`}
       ${p.pt ? `<div class="pt">${cleanPt(p.pt)}</div>` : ''}
       ${note ? `<div class="usernote">📝 ${esc(note)}</div>` : ''}
     </article>`;
   }
   if (foots.length) {
     html += `<section class="footnotes"><h3>Notas de rodapé</h3><ol>${foots.map((f, i) =>
-      `<li data-n="${f.n}" data-w="${esc(f.w)}"><span class="fn-mark">${footLetter(i)}</span> <b>v. ${f.v}</b> — <span class="fhe">${f.w}</span> <i>${esc(NOTES[f.n][0])}</i> (H${f.n}): ${esc(NOTES[f.n][1])}</li>`).join('')}</ol></section>`;
+      `<li data-n="${f.n}" data-w="${esc(f.w)}"><span class="fn-mark">${footLetter(i)}</span> <b>v. ${f.v}</b> — <span class="fhe">${f.w}</span> <i>${esc(notesFor(f.n)[0])}</i> (${f.n}): ${esc(notesFor(f.n)[1])}</li>`).join('')}</ol></section>`;
   }
   const prev = prevChapter(b, c), next = nextChapter(b, c);
   html += `<div class="chapter-nav">
@@ -246,10 +270,11 @@ function renderReader() {
   </div>`;
   $('#reader').innerHTML = html;
 }
+const notesFor = k => (k[0] === 'G' ? GNOTES : NOTES)[+k.slice(1)];
 const footLetter = i => 'abcdefghijklmnopqrstuvwxyz'[i % 26] + (i >= 26 ? Math.floor(i / 26) : '');
 
 function prevChapter(b, c) { if (c > 1) return [b, c - 1]; if (b > 1) return [b - 1, BY_ID[b - 1].chapters]; return null; }
-function nextChapter(b, c) { if (c < BY_ID[b].chapters) return [b, c + 1]; if (b < 39) return [b + 1, 1]; return null; }
+function nextChapter(b, c) { if (c < BY_ID[b].chapters) return [b, c + 1]; if (b < 66) return [b + 1, 1]; return null; }
 
 function updateTitle() { $('#titleText').textContent = ref(S.pos.b, S.pos.c); }
 
@@ -265,10 +290,11 @@ function sanitizeDef(html) {
       const tag = n.tagName;
       let el;
       if (tag === 'A') {
-        const m = (n.getAttribute('href') || '').match(/^S:H(\d+)/);
+        const m = (n.getAttribute('href') || '').match(/^S:([HG]\d+)/);
         el = document.createElement(m ? 'a' : 'span');
         if (m) el.dataset.strong = m[1];
       } else if (tag === 'HE') { el = document.createElement('span'); el.className = 'he'; }
+      else if (tag === 'EL') { el = document.createElement('span'); el.className = 'gr'; }
       else if (ALLOW.has(tag)) { el = document.createElement(tag.toLowerCase()); if (tag === 'OL' && n.getAttribute('type') === 'a') el.setAttribute('type', 'a'); }
       else el = document.createElement('span');
       el.appendChild(walk(n));
@@ -280,32 +306,33 @@ function sanitizeDef(html) {
 }
 
 async function openWord(word, strongs) {
-  const tr = translit(word, strongs);
-  const body = `<div class="lex-word">${stripTeamim(word)}</div>
-    <div class="lex-sub">${esc(tr)} ${strongs.map(n => `· <b>H${n}</b>`).join(' ')}</div>
-    ${strongs.map(n => `<div data-lex="${n}">${NOTES[n] ? `<div class="lex-card pt-note"><h4>Nota de estudo · ${esc(NOTES[n][0])}</h4>${esc(NOTES[n][1])}</div>` : ''}<div class="lex-card"><div class="spinner"></div></div></div>`).join('')}`;
+  const greek = strongs.length ? strongs[0][0] === 'G' : S.pos.b > 39;
+  const tr = word ? translit(word, greek ? [] : strongs.map(k => +k.slice(1))) : '';
+  const body = `<div class="lex-word ${greek ? 'gr' : ''}">${stripTeamim(word)}</div>
+    <div class="lex-sub">${esc(tr)} ${strongs.map(n => `· <b>${n}</b>`).join(' ')}</div>
+    ${strongs.map(n => { const nt = notesFor(n); return `<div data-lex="${n}">${nt ? `<div class="lex-card pt-note"><h4>Nota de estudo · ${esc(nt[0])}</h4>${esc(nt[1])}</div>` : ''}<div class="lex-card"><div class="spinner"></div></div></div>`; }).join('')}`;
   openSheet(body);
   for (const n of strongs) {
     const box = $(`[data-lex="${n}"] .lex-card:last-child`, $('#sheetBody'));
     try {
-      const arr = await fetchJSON(`${API}/dictionary-definition/BDBT/H${n}`);
-      const d = (arr || []).find(x => x.topic === 'H' + n) || (arr || [])[0];
+      const arr = await fetchJSON(`${API}/dictionary-definition/BDBT/${n}`);
+      const d = (arr || []).find(x => x.topic === n) || (arr || [])[0];
       if (!d) throw new Error('sem dados');
       if (!word && strongs.length === 1) {
         $('.lex-word', $('#sheetBody')).textContent = d.lexeme || '';
-        $('.lex-sub', $('#sheetBody')).innerHTML = `${esc(d.transliteration || '')} · <b>H${n}</b>`;
+        $('.lex-sub', $('#sheetBody')).innerHTML = `${esc(d.transliteration || '')} · <b>${n}</b>`;
       }
       const plain = new DOMParser().parseFromString(d.definition || '', 'text/html').body.textContent;
       const gt = `https://translate.google.com/?sl=en&tl=pt&op=translate&text=${encodeURIComponent((d.short_definition + '\n\n' + plain).slice(0, 1800))}`;
-      box.innerHTML = `<h4>Léxico (Strong H${n} · BDB)</h4>
+      box.innerHTML = `<h4>Léxico (Strong ${n} · ${greek ? 'Thayer' : 'BDB'})</h4>
         <div class="lex-def">
-          <div><span class="he" style="font-size:26px">${esc(d.lexeme || '')}</span> &nbsp; <i>${esc(d.transliteration || '')}</i> · <span class="muted">pronúncia: ${esc(d.pronunciation || '')}</span></div>
+          <div><span class="${greek ? 'gr' : 'he'}" style="font-size:26px">${esc(d.lexeme || '')}</span> &nbsp; <i>${esc(d.transliteration || '')}</i> · <span class="muted">pronúncia: ${esc(d.pronunciation || '')}</span></div>
           <p><b>Sentido básico (inglês):</b> ${esc(d.short_definition || '')}</p>
           ${sanitizeDef(d.definition || '')}
         </div>
-        <div class="sheet-actions"><a class="btn" href="${gt}" target="_blank" rel="noopener">Traduzir definição</a><button class="btn" data-hsearch="${esc(stripNiqqud(d.lexeme || word))}">Buscar no Tanakh</button></div>`;
+        <div class="sheet-actions"><a class="btn" href="${gt}" target="_blank" rel="noopener">Traduzir definição</a>${greek ? '' : `<button class="btn" data-hsearch="${esc(stripNiqqud(d.lexeme || word))}">Buscar no Tanakh</button>`}</div>`;
     } catch {
-      box.innerHTML = `<h4>Léxico (Strong H${n})</h4><span class="muted">Definição indisponível offline. Abra com internet uma vez para salvar.</span>`;
+      box.innerHTML = `<h4>Léxico (Strong ${n})</h4><span class="muted">Definição indisponível offline. Abra com internet uma vez para salvar.</span>`;
     }
   }
 }
@@ -470,12 +497,12 @@ async function renderBooks() {
   if (!pick.b) {
     $('#booksTitle').textContent = 'Livros';
     if (S.settings.order === 'tanakh') {
-      body.innerHTML = ['T', 'N', 'K'].map(sec => {
+      body.innerHTML = ['T', 'N', 'K', 'NT'].map(sec => {
         const list = BOOKS.filter(b => b.sec === sec).sort((a, z) => a.tanakh - z.tanakh);
-        return `<div class="sec-title" id="sec-${sec}"><b>${SECTIONS[sec].name}</b><span class="he">${SECTIONS[sec].he}</span><small>${SECTIONS[sec].desc}</small></div><div class="book-grid">${list.map(bookCard).join('')}</div>`;
+        return `<div class="sec-title" id="sec-${sec}"><b>${SECTIONS[sec].name}</b><span class="${sec === 'NT' ? 'gr' : 'he'}">${SECTIONS[sec].he}</span><small>${SECTIONS[sec].desc}</small></div><div class="book-grid">${list.map(bookCard).join('')}</div>`;
       }).join('');
     } else {
-      const groups = [['Pentateuco', 1, 5], ['Livros históricos', 6, 17], ['Livros poéticos', 18, 22], ['Profetas maiores', 23, 27], ['Profetas menores', 28, 39]];
+      const groups = [['Pentateuco', 1, 5], ['Livros históricos', 6, 17], ['Livros poéticos', 18, 22], ['Profetas maiores', 23, 27], ['Profetas menores', 28, 39], ['Evangelhos', 40, 43], ['História da igreja', 44, 44], ['Cartas de Paulo', 45, 57], ['Cartas gerais', 58, 65], ['Profecia', 66, 66]];
       body.innerHTML = groups.map(([n, a, z]) => `<div class="sec-title"><b>${n}</b></div><div class="book-grid">${BOOKS.filter(b => b.id >= a && b.id <= z).map(bookCard).join('')}</div>`).join('');
     }
     return;
@@ -483,7 +510,7 @@ async function renderBooks() {
   const book = BY_ID[pick.b];
   $('#booksTitle').textContent = book.name;
   if (!pick.c) {
-    body.innerHTML = `<div class="crumb"><button class="btn" data-back="books">← Livros</button><span class="he" style="font-size:22px;color:var(--gold)">${book.he}</span><span class="muted">${esc(book.tr)} · ${book.chapters} capítulo${book.chapters > 1 ? 's' : ''}</span></div>
+    body.innerHTML = `<div class="crumb"><button class="btn" data-back="books">← Livros</button><span class="${book.id > 39 ? 'gr' : 'he'}" style="font-size:22px;color:var(--gold)">${book.he}</span><span class="muted">${esc(book.tr)} · ${book.chapters} capítulo${book.chapters > 1 ? 's' : ''}</span></div>
       <div class="hint">Escolha o capítulo</div>
       <div class="num-grid">${Array.from({ length: book.chapters }, (_, i) => `<button data-ch="${i + 1}" class="${S.pos.b === book.id && S.pos.c === i + 1 ? 'cur' : ''}">${i + 1}</button>`).join('')}</div>`;
     return;
@@ -501,7 +528,7 @@ async function renderBooks() {
     if ($('#verseGrid')) $('#verseGrid').innerHTML = '<div class="muted" style="grid-column:1/-1">Sem conexão — toque em "Ler capítulo inteiro".</div>';
   }
 }
-const bookCard = b => `<button class="book ${S.pos.b === b.id ? 'cur' : ''}" data-book="${b.id}"><span class="he">${b.he}</span><b>${esc(b.name)}</b><small>${esc(b.tr)} · ${b.chapters} cap.</small></button>`;
+const bookCard = b => `<button class="book ${S.pos.b === b.id ? 'cur' : ''}" data-book="${b.id}"><span class="${b.id > 39 ? 'gr' : 'he'}">${b.he}</span><b>${esc(b.name)}</b><small>${esc(b.tr)} · ${b.chapters} cap.</small></button>`;
 
 $('#booksBody').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
@@ -521,7 +548,8 @@ $('#orderSeg').addEventListener('click', e => {
 const EXTRA = {
   gen: 1, genesis: 1, ex: 2, exo: 2, exodo: 2, lev: 3, num: 4, deut: 5, deu: 5, jos: 6, josue: 6, juizes: 7, jui: 7, rute: 8, rut: 8,
   '1samuel': 9, '1sam': 9, '1s': 9, '2samuel': 10, '2sam': 10, '2s': 10, '1reis': 11, '1re': 11, '1r': 11, '2reis': 12, '2re': 12, '2r': 12,
-  '1cronicas': 13, '1cro': 13, '2cronicas': 14, '2cro': 14, esd: 15, esdras: 15, nee: 16, neemias: 16, est: 17, ester: 17, job: 18, jo: 18,
+  '1cronicas': 13, '1cro': 13, '2cronicas': 14, '2cro': 14, esd: 15, esdras: 15, nee: 16, neemias: 16, est: 17, ester: 17, job: 18,
+  mat: 40, mt: 40, mar: 41, lc: 42, luc: 42, joao: 43, atos: 44, at: 44, rom: 45, gal: 48, efe: 49, fil: 50, col: 51, tes: 52, tim: 54, tit: 56, filemom: 57, heb: 58, tg: 59, tiago: 59, ap: 66, apo: 66, apocalipse: 66,
   sal: 19, salmo: 19, salmos: 19, sl: 19, ps: 19, prov: 20, pr: 20, ecl: 21, ecle: 21, cantares: 22, cantico: 22, canticos: 22, cant: 22, ct: 22,
   isa: 23, isaias: 23, jer: 24, jeremias: 24, lam: 25, eze: 26, ezeq: 26, dan: 27, oseias: 28, ose: 28, oseas: 28, joe: 29, amos: 30, obd: 31, abdias: 31,
   jon: 32, jonas: 32, miq: 33, miqueias: 33, nau: 34, naum: 34, hab: 35, habacuc: 35, sof: 36, ageu: 37, zac: 38, mal: 39,
@@ -534,7 +562,8 @@ function parseRef(q) {
   const s = norm(q).replace(/[.]/g, ' ').replace(/\s+/g, ' ').trim();
   const m = s.match(/^([1-3]?\s?[a-z][a-z' ]*?)\s*(\d+)?(?:\s*[:,. ]\s*(\d+))?(?:\s*-\s*\d+)?$/);
   if (!m) return null;
-  const key = m[1].replace(/[\s']/g, '');
+  let key = m[1].replace(/[\s']/g, '');
+  if (/^jó(\s|\d|$)/i.test(q.trim())) key = 'job';
   let id = ALIASES[key];
   if (!id && m[2] && key.length >= 2) {
     const hit = BOOKS.find(b => norm(b.name).replace(/\s/g, '').startsWith(key) || norm(b.tr).replace(/[\s']/g, '').startsWith(key));
@@ -558,7 +587,7 @@ async function doSearch(q) {
   box.innerHTML = '<div class="loading"><div class="spinner"></div>Buscando…</div>';
   try {
     const data = await fetchJSON(`${API}/v2/find/${trans}?search=${encodeURIComponent(q)}&match_case=false&match_whole=false&limit=300&page=1`);
-    const res = (data.results || []).filter(x => x.book <= 39);
+    const res = (data.results || []).filter(x => !isHeb || x.book <= 39);
     if (!res.length) { box.innerHTML = `<div class="empty">Nenhum resultado para “${esc(q)}”.</div>`; return; }
     const hl = new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     box.innerHTML = `<p class="hint">${res.length} resultado(s) no Tanakh${isHeb ? ' (texto hebraico)' : ' · ' + esc(trans)}</p>` + res.map(x => {
@@ -640,8 +669,8 @@ $('#dlBook').addEventListener('click', () => {
   downloadChapters(Array.from({ length: b.chapters }, (_, i) => [b.id, i + 1]), b.name);
 });
 $('#dlAll').addEventListener('click', () => {
-  if (!confirm('Baixar os 929 capítulos do Tanakh (hebraico + tradução escolhida)? Isso pode levar alguns minutos e usar cerca de 15–25 MB.')) return;
-  downloadChapters(BOOKS.flatMap(b => Array.from({ length: b.chapters }, (_, i) => [b.id, i + 1])), 'Tanakh');
+  if (!confirm('Baixar os 1.189 capítulos da Bíblia (texto original + tradução escolhida)? Isso pode levar alguns minutos e usar cerca de 25–40 MB.')) return;
+  downloadChapters(BOOKS.flatMap(b => Array.from({ length: b.chapters }, (_, i) => [b.id, i + 1])), 'Bíblia');
 });
 
 /* ---------- eventos gerais ---------- */
@@ -663,7 +692,7 @@ $('#drawer').addEventListener('click', e => {
     });
   }
 });
-$('#drawerSections').innerHTML = ['T', 'N', 'K'].map(k => `<button data-sec="${k}">${SECTIONS[k].name}<span class="he">${SECTIONS[k].he}</span></button>`).join('');
+$('#drawerSections').innerHTML = ['T', 'N', 'K', 'NT'].map(k => `<button data-sec="${k}">${SECTIONS[k].name}<span class="${k === 'NT' ? 'gr' : 'he'}">${SECTIONS[k].he}</span></button>`).join('');
 $('#titleBtn').addEventListener('click', () => { pick = { b: S.pos.b, c: null }; if (location.hash === '#livros') renderBooks(); else location.hash = '#livros'; });
 $('#prevBtn').addEventListener('click', () => { const p = prevChapter(S.pos.b, S.pos.c); if (p) openChapter(...p); });
 $('#nextBtn').addEventListener('click', () => { const p = nextChapter(S.pos.b, S.pos.c); if (p) openChapter(...p); });
@@ -672,17 +701,17 @@ document.addEventListener('click', e => {
   const go = e.target.closest('[data-go]');
   if (go) { const [b, c, v] = go.dataset.go.split(',').map(Number); openChapter(b, c, v || null); return; }
   const strongLink = e.target.closest('a[data-strong]');
-  if (strongLink) { e.preventDefault(); openWord('', [+strongLink.dataset.strong]); return; }
+  if (strongLink) { e.preventDefault(); openWord('', [strongLink.dataset.strong]); return; }
   const hs = e.target.closest('[data-hsearch]');
   if (hs) { const q = hs.dataset.hsearch; closeOverlay(() => doSearch(q)); }
 });
 $('#reader').addEventListener('click', e => {
   const w = e.target.closest('.w[data-s]');
-  if (w) { $$('.w.sel').forEach(x => x.classList.remove('sel')); openWord(w.dataset.w, w.dataset.s.split(',').map(Number)); w.classList.add('sel'); return; }
+  if (w) { $$('.w.sel').forEach(x => x.classList.remove('sel')); openWord(w.dataset.w, w.dataset.s.split(',')); w.classList.add('sel'); return; }
   const vn = e.target.closest('.vnum');
   if (vn) { openVerse(+vn.dataset.v); return; }
   const fn = e.target.closest('.footnotes li');
-  if (fn) openWord(fn.dataset.w, [+fn.dataset.n]);
+  if (fn) openWord(fn.dataset.w, [fn.dataset.n]);
 });
 
 // deslizar para trocar de capítulo
