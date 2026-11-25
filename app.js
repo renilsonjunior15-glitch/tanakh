@@ -240,7 +240,7 @@ function renderReader() {
         const keys = t.s.map(n => pre + n);
         const key = keys.find(k => notesFor(k));
         if (key && !vn.some(x => x.n === key)) vn.push({ n: key, w: stripTeamim(t.w) });
-        if (key && st.foot) sup = '<sup>•</sup>';
+        // sem marcas visuais: notas aparecem ao tocar no número do versículo
         const tr = translit(t.w, gk ? [] : t.s);
         if (st.translit) tl.push(tr);
         if (st.mode === 'inter') {
@@ -254,7 +254,7 @@ function renderReader() {
     if (st.mode !== 'inter' && st.translit && tl.length) heb += `<div class="translit-line">${esc(tl.join(' '))}</div>`;
     const note = S.notes[`${b}:${c}:${p.v}`];
     html += `<article class="verse" id="v-${p.v}">
-      <div class="vhead"><button class="vnum ${vn.length && st.foot ? 'has-notes' : ''}" data-v="${p.v}" aria-label="Notas e opções do versículo ${p.v}">${p.v}${vn.length && st.foot ? `<span class="vn-count">${vn.length}</span>` : ''}</button><span class="vref">${esc(refShort(b, c, p.v))}</span>${marks.has(p.v) ? '<span class="vmark">🔖</span>' : ''}</div>
+      <div class="vhead"><button class="vnum" data-v="${p.v}" aria-label="Notas e opções do versículo ${p.v}">${p.v}</button><span class="vref">${esc(refShort(b, c, p.v))}</span>${marks.has(p.v) ? '<span class="vmark">🔖</span>' : ''}</div>
       ${heb || `<div class="muted">(sem texto ${gk ? 'grego' : 'hebraico'} correspondente)</div>`}
       ${p.pt ? `<div class="pt">${cleanPt(p.pt)}</div>` : ''}
       ${note ? `<div class="usernote">📝 ${esc(note)}</div>` : ''}
@@ -655,7 +655,7 @@ function renderSettings() {
   const st = S.settings;
   $('#setTrans').innerHTML = TRANSLATIONS.map(([k, n]) => `<option value="${k}" ${k === st.trans ? 'selected' : ''}>${esc(n)}</option>`).join('');
   $('#setFont').value = st.font; $('#fontVal').textContent = st.font + 'px';
-  $('#setTranslit').checked = st.translit; $('#setStrong').checked = st.strong; $('#setTeamim').checked = st.teamim; $('#setFoot').checked = st.foot;
+  $('#setTranslit').checked = st.translit; $('#setStrong').checked = st.strong; $('#setTeamim').checked = st.teamim; 
   $$('#modeSeg button').forEach(x => x.classList.toggle('on', x.dataset.mode === st.mode));
   $$('#themeSeg button').forEach(x => x.classList.toggle('on', x.dataset.theme === st.theme));
 }
@@ -665,7 +665,6 @@ $('#setFont').addEventListener('input', e => { S.settings.font = +e.target.value
 $('#setTranslit').addEventListener('change', e => setSetting('translit', e.target.checked));
 $('#setStrong').addEventListener('change', e => setSetting('strong', e.target.checked));
 $('#setTeamim').addEventListener('change', e => setSetting('teamim', e.target.checked));
-$('#setFoot').addEventListener('change', e => setSetting('foot', e.target.checked));
 $('#modeSeg').addEventListener('click', e => { const m = e.target.closest('[data-mode]')?.dataset.mode; if (m) setSetting('mode', m); });
 $('#themeSeg').addEventListener('click', e => { const m = e.target.closest('[data-theme]')?.dataset.theme; if (m) setSetting('theme', m); });
 
