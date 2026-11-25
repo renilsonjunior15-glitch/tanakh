@@ -180,6 +180,7 @@ async function loadChapter(b, c) {
 
 /* ---------- leitor ---------- */
 let current = null; // {b, c, pairs}
+let verseNotes = {}; // notas de estudo de cada versículo do capítulo aberto
 let readSeq = 0;
 let loading = false;
 
@@ -227,6 +228,7 @@ function renderReader() {
   let html = `<div class="chapter-head"><span class="${gk ? 'gr' : 'he'}">${book.he}</span><h2>${esc(book.name)} ${c}</h2><small>${esc(book.tr)} · ${esc(transName)}</small></div>`;
   for (const p of pairs) {
     let heb = '', tl = [];
+    const vn = []; verseNotes[p.v] = vn;
     for (const h of p.h) {
       const label = (h.hc !== c || h.hv !== p.v) ? `<span class="pt-label" style="display:block;direction:ltr;text-align:left">Hebraico ${h.hc}:${h.hv}</span>` : '';
       const toks = parseHeb(h.text);
@@ -236,10 +238,9 @@ function renderReader() {
         if (!t.s.length) { words += `<span class="w plain">${shown}</span> `; continue; }
         let sup = '';
         const keys = t.s.map(n => pre + n);
-        if (st.foot) {
-          const key = keys.find(k => notesFor(k) && !seen.has(k));
-          if (key) { seen.add(key); foots.push({ n: key, v: p.v, w: stripTeamim(t.w) }); sup = `<sup>${footLetter(foots.length - 1)}</sup>`; }
-        }
+        const key = keys.find(k => notesFor(k));
+        if (key && !vn.some(x => x.n === key)) vn.push({ n: key, w: stripTeamim(t.w) });
+        if (key && st.foot) sup = '<sup>•</sup>';
         const tr = translit(t.w, gk ? [] : t.s);
         if (st.translit) tl.push(tr);
         if (st.mode === 'inter') {
@@ -253,15 +254,21 @@ function renderReader() {
     if (st.mode !== 'inter' && st.translit && tl.length) heb += `<div class="translit-line">${esc(tl.join(' '))}</div>`;
     const note = S.notes[`${b}:${c}:${p.v}`];
     html += `<article class="verse" id="v-${p.v}">
-      <div class="vhead"><button class="vnum" data-v="${p.v}">${p.v}</button><span class="vref">${esc(refShort(b, c, p.v))}</span>${marks.has(p.v) ? '<span class="vmark">🔖</span>' : ''}</div>
+      <div class="vhead"><button class="vnum ${vn.length && st.foot ? 'has-notes' : ''}" data-v="${p.v}" aria-label="Notas e opções do versículo ${p.v}">${p.v}${vn.length && st.foot ? `<span class="vn-count">${vn.length}</span>` : ''}</button><span class="vref">${esc(refShort(b, c, p.v))}</span>${marks.has(p.v) ? '<span class="vmark">🔖</span>' : ''}</div>
       ${heb || `<div class="muted">(sem texto ${gk ? 'grego' : 'hebraico'} correspondente)</div>`}
       ${p.pt ? `<div class="pt">${cleanPt(p.pt)}</div>` : ''}
       ${note ? `<div class="usernote">📝 ${esc(note)}</div>` : ''}
     </article>`;
   }
-  if (foots.length) {
-    html += `<section class="footnotes"><h3>Notas de rodapé</h3><ol>${foots.map((f, i) =>
-      `<li data-n="${f.n}" data-w="${esc(f.w)}"><span class="fn-mark">${footLetter(i)}</span> <b>v. ${f.v}</b> — <span class="fhe">${f.w}</span> <i>${esc(notesFor(f.n)[0])}</i> (${f.n}): ${esc(notesFor(f.n)[1])}</li>`).join('')}</ol></section>`;
+  const info = BOOK_INFO[b];
+  if (info) {
+    html += `<section class="footnotes context">
+      <h3>Contexto histórico · ${esc(book.name)}</h3>
+      <p class="ctx-author">${esc(info[0])}</p>
+      <p>${esc(info[1])}</p>
+      <h4>Pontos importantes</h4>
+      <ul>${info[2].map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    </section>`;
   }
   const prev = prevChapter(b, c), next = nextChapter(b, c);
   html += `<div class="chapter-nav">
@@ -341,7 +348,18 @@ async function openWord(word, strongs) {
 function openVerse(v) {
   const { b, c } = S.pos;
   const marked = S.bookmarks.some(x => x.b === b && x.c === c && x.v === v);
+  const vn = verseNotes[v] || [];
+  const gk = b > 39;
+  const notesHtml = vn.length
+    ? `<div class="vnotes">${vn.map(f => { const nt = notesFor(f.n); return `<button class="vnote" data-n="${f.n}" data-w="${esc(f.w)}">
+        <span class="${gk ? 'gr' : 'he'} vnote-w">${f.w}</span>
+        <span class="vnote-body"><b>${esc(nt[0])}</b> <small>${f.n}</small><br>${esc(nt[1])}</span></button>`; }).join('')}</div>`
+    : `<p class="muted vnotes-empty">Este versículo não tem notas de estudo. Toque em qualquer palavra ${gk ? 'grega' : 'hebraica'} para ver o significado no léxico.</p>`;
+  const myNote = S.notes[`${b}:${c}:${v}`];
   openSheet(`<h3>${esc(ref(b, c, v))}</h3>
+    <h4 class="sheet-sub">Notas de estudo</h4>
+    ${notesHtml}
+    ${myNote ? `<div class="usernote">📝 ${esc(myNote)}</div>` : ''}
     <div class="sheet-actions">
       <button class="btn" data-act="mark">${marked ? '🔖 Remover marcador' : '🔖 Marcar'}</button>
       <button class="btn" data-act="note">📝 ${S.notes[`${b}:${c}:${v}`] ? 'Editar nota' : 'Adicionar nota'}</button>
@@ -349,6 +367,8 @@ function openVerse(v) {
       <button class="btn" data-act="share">📤 Compartilhar</button>
     </div>`);
   $('#sheetBody').onclick = async e => {
+    const vnote = e.target.closest('.vnote');
+    if (vnote) { openWord(vnote.dataset.w, [vnote.dataset.n]); return; }
     const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
     if (act === 'mark') {
       if (marked) S.bookmarks = S.bookmarks.filter(x => !(x.b === b && x.c === c && x.v === v));
@@ -710,8 +730,6 @@ $('#reader').addEventListener('click', e => {
   if (w) { $$('.w.sel').forEach(x => x.classList.remove('sel')); openWord(w.dataset.w, w.dataset.s.split(',')); w.classList.add('sel'); return; }
   const vn = e.target.closest('.vnum');
   if (vn) { openVerse(+vn.dataset.v); return; }
-  const fn = e.target.closest('.footnotes li');
-  if (fn) openWord(fn.dataset.w, [fn.dataset.n]);
 });
 
 // deslizar para trocar de capítulo

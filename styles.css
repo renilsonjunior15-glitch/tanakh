@@ -161,6 +161,22 @@ main { padding: calc(var(--top-h) + env(safe-area-inset-top)) 0 calc(var(--nav-h
 .footnotes li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 14.5px; cursor: pointer; }
 .footnotes li:first-child { border-top: 0; }
 .footnotes .fhe { font-family: var(--font-he); font-size: 19px; }
+.vnum { position: relative; }
+.vnum.has-notes { background: var(--gold); color: var(--accent-ink); }
+.vn-count { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 10px; line-height: 16px; padding: 0 4px; border: 1.5px solid var(--bg); }
+.footnotes.context { cursor: default; }
+.footnotes.context .ctx-author { color: var(--gold); font-weight: 600; font-size: 14px; margin: 0 0 6px; }
+.footnotes.context p { font-family: var(--font-pt); font-size: 16px; line-height: 1.6; margin: 0 0 12px; }
+.footnotes.context h4 { margin: 4px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.footnotes.context ul { margin: 0; padding-left: 20px; font-size: 15px; }
+.footnotes.context li { border: 0; padding: 3px 0; cursor: default; }
+.sheet-sub { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.vnotes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.vnote { display: flex; gap: 12px; align-items: flex-start; text-align: left; background: var(--note); border: 0; border-left: 3px solid var(--note-line); border-radius: 10px; padding: 10px 12px; }
+.vnote-w { font-size: 24px; color: var(--gold); flex: none; line-height: 1.3; }
+.vnote-body { font-size: 14.5px; line-height: 1.5; min-width: 0; }
+.vnote-body small { color: var(--muted); }
+.vnotes-empty { font-size: 14px; }
 .chapter-nav { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0; }
 .chapter-nav .btn { flex: 1; }
 .loading, .empty { text-align: center; color: var(--muted); padding: 50px 10px; }
