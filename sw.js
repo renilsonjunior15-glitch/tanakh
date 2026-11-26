@@ -1,5 +1,5 @@
 // Service worker: deixa o app funcionando offline.
-const VERSION = 'tanakh-v5';
+const VERSION = 'tanakh-v6';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'daily.js', 'context.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'];
 const DATA = 'tanakh-data'; // textos bíblicos e léxico (não mudam)
 const FONTS = 'tanakh-fonts';

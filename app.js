@@ -465,13 +465,28 @@ function renderHome() {
   $('#continueLabel').textContent = startedReading ? 'Continuar leitura' : 'Começar a leitura';
   $('#continueRef').textContent = ref(S.pos.b, S.pos.c, S.pos.v);
 
-  const [b, c, v, title, text, hw, htr, hmean, q] = DAILY[dayIndex()];
+  const d = DAILY[dayIndex()], [b, c, v] = d.r;
   const box = $('#dailyVerse');
-  $('#devo').innerHTML = `<h3>${esc(title)}</h3>
-    <p>${esc(text)}</p>
-    <div class="devo-word"><span class="he">${hw}</span><div><b>${esc(htr)}</b><br><span>${esc(hmean)}</span></div></div>
-    <div class="devo-q"><b>Para refletir</b><p>${esc(q)}</p></div>
-    <button class="btn" data-go="${b},${c},${v}">Ler ${esc(ref(b, c))} no contexto</button>`;
+  $('#devo').innerHTML = `<div class="devo-ref">${esc(ref(b, c, v))}</div>
+    <h3>${esc(d.t)}</h3>
+    <div class="devo-sec devo-ctx"><b>Contexto</b><p>${esc(d.ctx)}</p></div>
+    <p>${esc(d.p[0])}</p>
+    <div class="devo-more" hidden>
+      ${d.p.slice(1).map(x => `<p>${esc(x)}</p>`).join('')}
+      <div class="devo-word"><span class="he">${d.w[0]}</span><div><b>${esc(d.w[1])}</b><br><span>${esc(d.w[2])}</span></div></div>
+      <div class="devo-sec"><b>Ecos nas Escrituras</b>
+        <div class="devo-ecos">${d.ecos.map(([eb, ec, ev, t]) => `<button data-go="${eb},${ec},${ev}"><b>${esc(ref(eb, ec, ev))}</b><span>${esc(t)}</span></button>`).join('')}</div></div>
+      <div class="devo-sec devo-pr"><b>Prática para hoje</b><p>${esc(d.pr)}</p></div>
+      <div class="devo-q"><b>Para refletir</b>${d.q.map(x => `<p>${esc(x)}</p>`).join('')}</div>
+      <div class="devo-or"><b>Oração</b><p>${esc(d.or)}</p></div>
+    </div>
+    <div class="btn-row"><button class="btn primary" id="devoMore">Continuar o devocional</button><button class="btn" data-go="${b},${c},${v}">Ler ${esc(ref(b, c))}</button></div>`;
+  $('#devoMore').onclick = () => {
+    const m = $('#devo .devo-more'), open = m.hidden;
+    m.hidden = !open;
+    $('#devoMore').textContent = open ? 'Recolher' : 'Continuar o devocional';
+    if (!open) $('#devo').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   if (box.dataset.day === String(dayIndex()) && box.dataset.trans === S.settings.trans && box.querySelector('.dv-pt')) return;
   box.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   loadChapter(b, c).then(pairs => {

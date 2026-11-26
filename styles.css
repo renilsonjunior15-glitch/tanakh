@@ -99,7 +99,20 @@ main { padding: calc(var(--top-h) + env(safe-area-inset-top)) 0 calc(var(--nav-h
 .devo-word span:not(.he) { font-size: 14.5px; }
 .devo-q { background: var(--note); border-left: 3px solid var(--note-line); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
 .devo-q b { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.devo-q p { margin: 4px 0 0; }
+.devo-q p { margin: 6px 0 0; }
+.devo-q { margin-bottom: 12px; }
+.devo-ref { font-size: 12px; color: var(--gold); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+.devo-sec, .devo-or { margin: 4px 0 14px; }
+.devo-sec > b, .devo-or > b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+.devo-ctx p { font-size: 15.5px; color: var(--muted); }
+.devo-pr { background: var(--gold-soft); border-radius: 10px; padding: 10px 14px; }
+.devo-pr p { margin: 0; }
+.devo-ecos { display: grid; gap: 8px; }
+.devo-ecos button { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; color: var(--text); font: inherit; cursor: pointer; }
+.devo-ecos button b { color: var(--gold); font-size: 14px; margin-right: 6px; }
+.devo-ecos button span { font-family: var(--font-pt); font-size: 15px; }
+.devo-or p { font-style: italic; }
+.devo .btn-row { margin-top: 4px; }
 .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .menu-grid a { text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
 .menu-grid a span { font-size: 22px; }
